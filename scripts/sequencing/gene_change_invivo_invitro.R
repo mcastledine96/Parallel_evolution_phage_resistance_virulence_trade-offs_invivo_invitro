@@ -2,6 +2,12 @@
 # Processing in vivo clone vcf files and plotting ####
 #----------------------------------------------------#
 
+# summary of what this script does
+
+# 1. reads in clone in vivo vcf files and processes them
+# 2. makes Figure 4
+# 3. looks at distribution of SNPs/indels in in vivo clones and looks for patterns across phenotypes
+
 # load packages
 library(tidyverse)
 library(vcfR)
@@ -11,7 +17,6 @@ library(patchwork)
 
 # function to clean up freebayes vcf files
 
-# filter depth to be no more than 2 s.d. from the mean
 tidy_freebayes <- function(freebayes_vcf){
   temp <- vcfR::read.vcfR(freebayes_vcf, verbose = FALSE)
   temp <- vcfR::vcfR2tidy(temp, single_frame = TRUE) %>%
@@ -58,12 +63,12 @@ d2 <- left_join(d2, d_meta)
 
 # make a bunch of key columns numeric and choose only the columns that are needed
 # keep only variants that are at fixation
-d2 <- select(d2, clone, mapping_tool, ref_genome, chrom, pos, ref, alt, qual, dp, af, numalt) %>%
+d2 <- select(d2, clone, time_point, mapping_tool, ref_genome, chrom, pos, ref, alt, qual, dp, af, numalt) %>%
   mutate(., across(qual:numalt, as.numeric)) %>%
   filter(af == 1)
 
 # load in 24 ancestral clone data
-d_ancestors <- readRDS('sequencing/data/ancestors.rds') %>%
+d_ancestors <- readRDS('data/sequencing/ancestors.rds') %>%
   rename(ancest_alt = alt, ancest_prop = af_mean) %>%
   select(-ref)
 
@@ -77,13 +82,6 @@ d_ancest2 <- group_by(d_ancestors, pos) %>%
 d_ancestors <- filter(d_ancestors, ! pos %in% d_ancest2$pos) %>%
   select(-ancest_prop) %>%
   bind_rows(., d_ancest2)
-
-unique(d2$pos) %>% length()
-unique(d_ancestors$pos) %>% length()
-unique(d_ancestors$pos) %in% unique(d2$pos) %>% sum()
-unique(d2$pos) %in% d_ancestors$pos %>% sum()
-
-52746 / 55270 * 100
 
 d2 <- left_join(d2, d_ancestors) %>%
   mutate(., ancest_pres = ifelse(is.na(ancest_alt), 'no', 'yes'))
@@ -105,7 +103,8 @@ ggplot(d_sum, aes(n)) +
 # load in SNPs from the invitro study ####
 #----------------------------------------#
 
-invitro_snps <- read.csv("known_genes_forplot.csv") %>%
+# create data frame of unique SNPs from in vitro data
+invitro_snps <- read.csv('data/sequencing/invitro_snps_indels.csv') %>%
   filter(!is.na(ref)) %>%
   dplyr::select(-n) %>%
   select(., gene_name, ref, alt, id3, pos, change2) %>%
@@ -113,12 +112,24 @@ invitro_snps <- read.csv("known_genes_forplot.csv") %>%
   rename(ref_invitro = ref, alt_invitro = alt)
 
 # load in invitro data
-d_invitro <- read.csv("known_genes_forplot.csv", header = TRUE, stringsAsFactors = FALSE) %>%
+d_invitro <- read.csv('data/sequencing/invitro_snps_indels.csv', header = TRUE, stringsAsFactors = FALSE) %>%
   dplyr::select(-n) %>%
   select(., af, gene_name, id3, change2, id2, pos) %>%
-  mutate(id4 = 'invitro populations')
+  mutate(id4 = 'invitro populations',
+         id2 = 1+id2)
 
-# search for these SNPs in the clones
+# add ancestors to dataset
+ancestor <- read.csv('data/sequencing/invitro_snps_indels.csv', header = TRUE, stringsAsFactors = FALSE) %>%
+  select(., ancestral_prop, pos, gene_name, ref, alt, id3) %>%
+  distinct(., .keep_all = TRUE) %>%
+  pivot_longer(., ancestral_prop, names_to = 'treat', values_to = 'af') %>%
+  mutate(., id4 = 'invitro populations',
+         id2 = 1)
+
+d_invitro <- bind_rows(d_invitro, ancestor)
+
+# search for these SNPs in the in vivo clones
+# create a column for where the in vivo clones will be in the plot
 d3 <- filter(d2, pos %in% invitro_snps$pos) %>%
   left_join(invitro_snps) %>%
   group_by(time_point, clone) %>%
@@ -127,6 +138,7 @@ d3 <- filter(d2, pos %in% invitro_snps$pos) %>%
   ungroup() %>%
   select(., af, gene_name, id3, change2, id2, pos, id4)
 
+# calculate proportion of each SNP in the in vivo clones as a whole (10 clones)
 d3 <- d3 %>%
   group_by(gene_name, id3, change2, pos, id4) %>%
   summarise(af = sum(af)/10, .groups = 'drop') %>%
@@ -134,9 +146,14 @@ d3 <- d3 %>%
 
 d3 <- bind_rows(d_invitro, d3)
 
-# try make plot
+#------------------#
+# make Figure 4 ####
+#------------------#
+
+# check number of SNPs/indels is right
 unique(d3$id3) %>% length()
 
+# create data from for where lines are
 gene_lines <- dplyr::select(d3, gene_name, pos, id3) %>%
   distinct(.keep_all = TRUE) %>%
   arrange(desc(gene_name)) %>%
@@ -162,7 +179,8 @@ xlines <- tibble(x = c(1.5, 7.5, 13.5, 19.5), id4 = c('invitro populations', 'in
 
 head(d4)
 
-#set dimensions - 700 x 1200
+# create plot three times to get the legends as we want
+
 p1 <- ggplot(d4, aes(x = id2, y = interaction(gene_name, n))) +
   geom_tile(aes(alpha = af, fill = change2), col = 'black', show.legend = FALSE) +
   ylab("Gene") +
@@ -174,7 +192,7 @@ p1 <- ggplot(d4, aes(x = id2, y = interaction(gene_name, n))) +
                          guide = guide_legend(override.aes = list(fill = "#7090A0"))) +
   geom_vline(aes(xintercept = x), size = 1, xlines) +
   geom_hline(aes(yintercept = n - 0.5), size = 0.75, gene_lines2) +
-  scale_fill_manual(values = c('#7090A0', rev(ichooseyou('vileplume', spread = 2))), labels = c("Ancestor", "Existing", "Gain")) +
+  scale_fill_manual(values = c(rev(ichooseyou('vileplume', spread = 2))), labels = c("Existing", "Gain")) +
   theme(axis.title.x = element_blank(),
         axis.text.x = element_text(size = 12, colour = 'black'),
         panel.grid.major = element_blank(), 
@@ -198,7 +216,7 @@ p2 <- ggplot(d4, aes(x = id2, y = interaction(gene_name, n))) +
                                               title.hjust = 0.4)) +
   geom_vline(aes(xintercept = x), size = 1, xlines) +
   geom_hline(aes(yintercept = n - 0.5), size = 0.75, gene_lines2) +
-  scale_fill_manual(values = c('#7090A0', rev(ichooseyou('vileplume', spread = 2))), labels = c("Ancestor", "Existing", "Gain"), guide = NULL) +
+  scale_fill_manual(values = c(rev(ichooseyou('vileplume', spread = 2))), labels = c("Existing", "Gain"), guide = NULL) +
   theme(axis.title.x = element_blank(),
         axis.text.x = element_text(size = 12, colour = 'black'),
         panel.grid.major = element_blank(), 
@@ -223,7 +241,7 @@ p3 <- ggplot(d4, aes(x = id2, y = interaction(gene_name, n))) +
                                               title.hjust = 0.4)) +
   geom_vline(aes(xintercept = x), size = 1, xlines) +
   geom_hline(aes(yintercept = n - 0.5), size = 0.75, gene_lines2) +
-  scale_fill_manual(values = c('#7090A0', rev(ichooseyou('vileplume', spread = 2))), labels = c("Ancestor", "Existing", "Gain"), guide = NULL) +
+  scale_fill_manual(values = c(rev(ichooseyou('vileplume', spread = 2))), labels = c("Existing", "Gain"), guide = NULL) +
   theme(axis.title.x = element_blank(),
         axis.text.x = element_text(size = 12, colour = 'black'),
         panel.grid.major = element_blank(), 
@@ -242,133 +260,5 @@ legends <- cowplot::plot_grid(legend1, legend2, ncol = 1, align = 'v')
 
 p1 +  (plot_spacer()/legends + plot_layout(heights = c(0.6, 0.4))) + plot_layout(widths = c(0.8, 0.2))
 
-ggsave('phage_therapy/Plots/all_changes.pdf', last_plot(), height = 10, width = 8.5)
-ggsave('phage_therapy/Plots/all_changes.png', last_plot(), height = 10, width = 8.5)
-
-# look at SNPs present in vivo
-head(d_invivo)
-
-head(d2)
-
-head(invitro_snps)
-
-d_invivo_snps <- group_by(d2, clone, time_point) %>%
-  do(select(invitro_snps, gene_name, pos, change2)) %>%
-  left_join(., filter(d2, pos %in% invitro_snps$pos) %>% select(., clone, time_point, pos, ref, alt, af)) %>%
-  mutate(af = replace_na(af, 0))
-
-# look at how many SNPs there are per clone
-d_invivo_summary <- group_by(d_invivo_snps, clone, time_point) %>%
-  summarise(num_snps = sum(af), .groups = 'drop')
-
-# try and do an nmds on these samples
-d_clust <- select(d_invivo_snps, clone, time_point, pos, af, gene_name) %>%
-  unite(., 'id', c(clone, time_point), sep ='_') %>%
-  mutate(id = paste('c', id, sep = '')) %>%
-  spread(., id, af) %>%
-  arrange(pos) %>%
-  group_by(gene_name) %>%
-  mutate(n = 1:n()) %>%
-  ungroup() %>%
-  mutate(gene_name = ifelse(n > 1, paste(gene_name, n, sep = '_'), gene_name)) %>%
-  select(., -c(pos, n))
-
-d_clust <- tibble::column_to_rownames(d_clust, 'gene_name')
-
-nmds <- vegan::metaMDS(d_clust, distance = 'euclidean')
-
-vegan::stressplot(nmds)
-plot(nmds)
-
-# get data from nmds
-d_nmds <- fortify(nmds) %>%
-  janitor::clean_names() %>%
-  mutate_if(., is.factor, as.character)
-
-# wrangle sites
-d_sample <- filter(d_nmds, score== 'species') %>%
-  separate(., label, c('clone', 'time_point'), sep = '_')
-
-# get distance from 00
-dist_from_00 <- function(x, y){
-  return(sqrt((0 - x)^2+(0-y)^2))
-}
-
-# wrangle species
-d_gene <- filter(d_nmds, score == 'sites') %>%
-  rename(., gene_name = label) %>%
-  mutate(dist = dist_from_00(nmds1, nmds2))
-
-# phenotypic traits of invivo clones
-d_traits <- read.csv('phage_therapy/tidied_datasets/invivo_clone_phenotypes_160721.csv') %>%
-  left_join(., read.csv('phage_therapy/tidied_datasets/invivo_virulence.csv')) %>%
-  separate(clone, c('time_point', 'clone'), sep = '_') %>%
-  mutate(time_point = as.character(parse_number(time_point)),
-         clone = paste('c', clone, sep =''))
-
-d_sample <- left_join(d_sample, d_traits)
-
-# fancy biplot ####
-p_nmds1 <- ggplot() +
-  geom_segment(aes(x = 0, y = 0, yend = nmds2, xend = nmds1, group = score), d_gene, arrow = arrow(length = unit(0.01, "npc")), col = 'grey') +
-  geom_text(aes(nmds1, nmds2, label = gene_name, hjust = 0.5*(1 - sign(nmds1)), vjust = 0.5*(1-sign(nmds2))), d_gene, col = 'grey') +
-  #ggrepel::geom_text_repel(aes(nmds1, nmds2, label = gene_name, col = change2), d_gene) +
-  geom_point(aes(nmds1, nmds2, col = virulence), size = 5, data = filter(d_sample)) +
-  #geom_point(aes(nmds1, nmds2), size = 5, col = 'red', data = filter(d_sample, is.na(virulence))) +
-  scale_x_continuous(expand = c(.25, .25)) +
-  scale_y_continuous(expand = c(.25, .25)) +
-  scale_colour_gradient(low = '#a6dbb3', high = '#2a753d', na.value = 'red') +
-  labs(title = '(a) Virulence',
-       x = 'nmds 1',
-       y = 'nmds 2') +
-  theme_bw(base_size = 14) +
-  theme(legend.position = 'bottom', legend.title = element_blank())
-p_nmds1
-p_nmds2 <- ggplot() +
-  geom_segment(aes(x = 0, y = 0, yend = nmds2, xend = nmds1, group = score), d_gene, arrow = arrow(length = unit(0.01, "npc")), col = 'grey') +
-  geom_text(aes(nmds1, nmds2, label = gene_name, hjust = 0.5*(1 - sign(nmds1)), vjust = 0.5*(1-sign(nmds2))), d_gene, col = 'grey') +
-  #ggrepel::geom_text_repel(aes(nmds1, nmds2, label = gene_name, col = change2), d_gene) +
-  geom_point(aes(nmds1, nmds2, col = growth_r), size = 5, data = filter(d_sample)) +
-  #geom_point(aes(nmds1, nmds2), size = 5, col = 'red', data = filter(d_sample, is.na(virulence))) +
-  scale_x_continuous(expand = c(.25, .25)) +
-  scale_y_continuous(expand = c(.25, .25)) +
-  scale_colour_gradient(low = '#a6dbb3', high = '#2a753d', na.value = 'red') +
-  labs(title = '(b) Growth',
-       x = 'nmds 1',
-       y = 'nmds 2') +
-  theme_bw(base_size = 14) +
-  theme(legend.position = 'bottom', legend.title = element_blank())
-
-p_nmds3 <- ggplot() +
-  geom_segment(aes(x = 0, y = 0, yend = nmds2, xend = nmds1, group = score), d_gene, arrow = arrow(length = unit(0.01, "npc")), col = 'grey') +
-  geom_text(aes(nmds1, nmds2, label = gene_name, hjust = 0.5*(1 - sign(nmds1)), vjust = 0.5*(1-sign(nmds2))), d_gene, col = 'grey') +
-  #ggrepel::geom_text_repel(aes(nmds1, nmds2, label = gene_name, col = change2), d_gene) +
-  geom_point(aes(nmds1, nmds2, col = log(biofilm)), size = 5, data = filter(d_sample)) +
-  #geom_point(aes(nmds1, nmds2), size = 5, col = 'red', data = filter(d_sample, is.na(virulence))) +
-  scale_x_continuous(expand = c(.25, .25)) +
-  scale_y_continuous(expand = c(.25, .25)) +
-  scale_colour_gradient(low = '#a6dbb3', high = '#2a753d', na.value = 'red', breaks = c(5.1, 5.4, 5.7)) +
-  labs(title = '(c) Biofilm',
-       x = 'nmds 1',
-       y = 'nmds 2') +
-  theme_bw(base_size = 14) +
-  theme(legend.position = 'bottom', legend.title = element_blank()) 
-
-p_nmds4 <- ggplot() +
-  geom_segment(aes(x = 0, y = 0, yend = nmds2, xend = nmds1, group = score), d_gene, arrow = arrow(length = unit(0.01, "npc")), col = 'grey') +
-  geom_text(aes(nmds1, nmds2, label = gene_name, hjust = 0.5*(1 - sign(nmds1)), vjust = 0.5*(1-sign(nmds2))), d_gene, col = 'grey') +
-  #ggrepel::geom_text_repel(aes(nmds1, nmds2, label = gene_name, col = change2), d_gene) +
-  geom_point(aes(nmds1, nmds2, col = res_type), size = 5, data = filter(d_sample)) +
-  #geom_point(aes(nmds1, nmds2), size = 5, col = 'red', data = filter(d_sample, is.na(virulence))) +
-  scale_x_continuous(expand = c(.25, .25)) +
-  scale_y_continuous(expand = c(.25, .25)) +
-  labs(title = '(d) Phage resistance',
-       x = 'nmds 1',
-       y = 'nmds 2') +
-  theme_bw(base_size = 14) +
-  theme(legend.position = 'bottom', legend.title = element_blank()) +
-  scale_color_manual(values = c("#6090C8", "#404058", "#B82838"), labels = c("Resistant\n(both phages)", "Resistant\n(one phage)", "Susceptible")) 
-
-p_nmds_all <- p_nmds1 + p_nmds2 + p_nmds3 + p_nmds4
-
-ggsave('phage_therapy/Plots/gen_phen_nmds.png', p_nmds_all, height = 11, width = 11)
+ggsave('plots/Figure_4.pdf', last_plot(), height = 10, width = 8.5)
+ggsave('plots/Figure_4.png', last_plot(), height = 10, width = 8.5)

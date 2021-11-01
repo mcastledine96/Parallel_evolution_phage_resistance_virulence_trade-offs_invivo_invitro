@@ -263,9 +263,6 @@ d_filt2 <- mutate(d_filt2, af = replace_na(af, 0),
                                TRUE ~ 'existing'),
          change2 = ifelse(ancestral_prop == 0, 'gain', 'existing'))
 
-# save out as a table
-write_csv(d_filt2, 'data/sequencing/invitro_snps_indels.csv')
-
 # split into known and unknown genes
 d_genes_unknown <- filter(d_filt2, stringr::str_detect(gene_name, 'PA14'))
 d_genes_known <- filter(d_filt2, !stringr::str_detect(gene_name, 'PA14'))
@@ -281,6 +278,9 @@ d_genes_known <- unite(d_genes_known, 'id', c(treat, rep), na.rm = TRUE, remove 
          change2 = ifelse(is.na(change2), 'ancestor', change2))
 
 d_genes_known <- unite(d_genes_known, 'id3', c(gene_name, pos), na.rm = TRUE, remove = FALSE)
+
+# save out as a table
+write_csv(d_genes_known, 'data/sequencing/invitro_snps_indels.csv')
 
 #------------------#
 # do clustering ####
