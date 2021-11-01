@@ -4,7 +4,8 @@
 
 # load in packages ####
 library(survival)
-library(rstanarm) # remotes::install_github('stan-dev/rstanarm@feature/survival') - This may not create documentation for each function though
+library(rstanarm) # remotes::install_github('jburos/rstanarm@bugfix/stansurv-formula') - This may not create documentation for each function though
+# installing the development branch of rstanarm is very difficult at the moment. But the amazing functionality means that we have persevered with it.
 library(bayesplot)
 library(tidyverse)
 library(tidybayes)
@@ -12,7 +13,7 @@ library(patchwork)
 library(palettetown)
 
 # load in data
-vir_dat <- read.csv("phage_therapy/bacteria_virulence/data/virulence_processed.csv", 
+vir_dat <- read.csv("data/phenotype/virulence_data.csv", 
                     header = TRUE, 
                     stringsAsFactors = FALSE)
 
@@ -27,9 +28,6 @@ vir_dat <- read.csv("phage_therapy/bacteria_virulence/data/virulence_processed.c
   #galleria_ind2: 1 - 20 for each galleria used (technical replicates) for each bacterial clone
 
 vir_dat$clone %>% unique()
-
-# sort data for analysis ####
-
 unique(vir_dat$treat)
 
 # split data into invitro and invivo treatments
@@ -127,6 +125,7 @@ ranefs <- str_subset(tidybayes::get_variables(mod_invivo), paste(post_phage_ther
 
 # check key mcmc trace plots
 mcmc_trace(mod_invivo, pars = to_plot)
+# fuzzy caterpillars
 
 # extract draws
 # the exp() of the difference between two factors is the hazards ratio
@@ -139,34 +138,6 @@ params_invivo <- mutate(params_invivo, beforephage = intercept + treat2before_ph
   # calculate a hazard ratio for the postphage treatment
   mutate(hazard_post_vs_pre = exp(postphage - beforephage))
 
-invivo_hazards <- mutate(params_invivo, T1_3 = postphage + b_intercept_clone_e3,
-                         T1_4= postphage + b_intercept_clone_e4,
-                         T1_5 = postphage + b_intercept_clone_e5,
-                         T1_6 = postphage + b_intercept_clone_e6,
-                         T1_7 = postphage + b_intercept_clone_e7,
-                         T1_8 = postphage + b_intercept_clone_e8,
-                         T2_1 = postphage + b_intercept_clone_f1,
-                         T2_2 = postphage + b_intercept_clone_f2) %>%
-  select(chain, iteration, draw, postphage, starts_with('T', ignore.case = FALSE)) %>%
-  pivot_longer(., cols = starts_with('T', ignore.case = FALSE), names_to = 'clone', values_to = 'val') %>%
-  mutate(hazard_ratio = exp(val - postphage)) %>%
-  group_by(clone) %>%
-  median_qi(hazard_ratio)
-
-# plot of hazard ratios
-ggplot(invivo_hazards, aes(y = clone, x = hazard_ratio, xmin = .lower, xmax = .upper)) +
-  geom_vline(aes(xintercept = 1), linetype = 2) +
-  geom_point(size = 3, show.legend = FALSE) +
-  geom_linerange(show.legend = FALSE) +
-  theme_bw(base_size = 14) +
-  theme(axis.title.y = element_blank()) +
-  labs(y = 'Clone',
-       x = 'Hazard ratio vs. overall effect') +
-  xlim(c(0,35))
-
-ggsave('phage_therapy/Plots/invivo_clone_HR.png', last_plot(), height = 9, width = 6)
-write.csv(select(invivo_hazards, clone, virulence = hazard_ratio), 'phage_therapy/tidied_datasets/invivo_virulence.csv', row.names = FALSE)
-
 # calculate credible intervals of hazard ratios
 params2_invivo <- select(params_invivo, beforephage:hazard_post_vs_pre) %>%
   pivot_longer(cols = everything(), names_to = 'variable', values_to = 'estimate') %>%
@@ -175,7 +146,7 @@ params2_invivo <- select(params_invivo, beforephage:hazard_post_vs_pre) %>%
   ungroup() %>%
   rename(treat = variable)
 
-# hazard ratio is 0.0555, which means the clones isolated after phage therapy were 95% less likely to cause the death of a galleria at any time point during the study
+# hazard ratio is 0.0450, which means the clones isolated after phage therapy were 95% less likely to cause the death of a galleria at any time point during the study
 
 cols <- c("black", 'dark grey')
 
@@ -221,13 +192,6 @@ group_by(d_invivo, treat2, status) %>%
             n = n())
 479/480
 112/(112+48)
-
-# make vivo plot - this bit is very slow
-#vivo_plot <- vivo_plot + ggtext::geom_textbox(x = 28, y = 0.96, label = "Proportion that died: 0.99  \nMean time to death: 15 hours", hjust = 0, fill = 'white', box.colour = 'white', width = NULL) + ggtext::geom_textbox(x = 28, y = 0.84, label = "Proportion that died: 0.7  \nMean time to death: 20.5 hours", hjust = 0, fill = 'white', col = 'dark grey', box.colour = 'white', width = NULL)
-
-
-#ggsave('phage_therapy/Plots/invivo_virulence.png', last_plot(), height = 5, width = 7)
-#ggsave('phage_therapy/Plots/invivo_virulence.pdf', last_plot(), height = 5, width = 7)
 
 #-----------------#
 # invitro data ####
@@ -283,10 +247,6 @@ params_invitro <- spread_draws(mod_invitro, !!!syms(to_plot)) %>%
          susc = (control_np.susc + mix.susc + mix_add.susc)/3,
          resist_single = (mix.resist_sing + mix_add.resist_sing)/2,
          resist = (mix_add.resist + mix.resist)/2)
-
-# proportion of resistance profiles in mix_add and mix
-# mix_add: susceptible = , resist.one = , resist =
-# mix : susceptible = , resist.one = , resist =
 
 # the exp() of the difference between two factors is the hazards ratio
 # calculate the hazard for each treatment by adding things onto the intercept as would be normal for a summary(model) table in R
@@ -391,30 +351,6 @@ group_by(d_invitro, res, status) %>%
 
 total_plot <- vivo_plot + invitro + invitro2
 
-ggsave('phage_therapy/Plots/survival_plot.pdf', total_plot, height = 7, width = 18)
-ggsave('phage_therapy/Plots/survival_plot.png', total_plot, height = 7, width = 18)
-
-
-#-----------------------------------------------#
-# create plots for supplementary information ####
-#-----------------------------------------------#
-
-# calculate hazard ratios for between treatments
-# the exp() of the difference between two factors is the hazards ratio
-params_invitro <- mutate(params_invitro, hazard_mix_resboth_vs_susc = exp(mix.resist - mix.susc),
-                         hazard_mix_resone_vs_susc = exp(mix.resist_sing - mix.susc),
-                         hazard_mix_resboth_vs_resone = exp(mix.resist - mix.resist_sing),
-                         hazard_mixadd_resboth_vs_susc = exp(mix_add.resist - mix_add.susc),
-                         hazard_mixadd_resone_vs_susc = exp(mix_add.resist_sing - mix_add.susc),
-                         hazard_mixadd_resboth_vs_resone = exp(mix_add.resist - mix_add.resist_sing),
-                         hazard_resone_vs_susc = exp(mix_add.resist - mix_add.resist_sing))
-
-params2_invitro <- select(params_invitro, contains('hazard')) %>%
-  pivot_longer(cols = everything(), names_to = 'variable', values_to = 'estimate') %>%
-  group_by(variable) %>%
-  median_qi() %>%
-  ungroup() %>%
-  rename(treat = variable)
-
-filter(params2_invitro, str_detect(treat, 'mixadd_'))
-filter(params2_invitro, str_detect(treat, 'mix_'))
+ggsave('plots/Figure_2.pdf', total_plot, height = 7, width = 18)
+ggsave('plots/Figure_2.png', total_plot, height = 7, width = 18)
+remotes::install_github('jburos/rstanarm@bugfix/stansurv-formula')
