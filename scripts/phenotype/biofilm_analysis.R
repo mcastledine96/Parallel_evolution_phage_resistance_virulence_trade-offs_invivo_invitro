@@ -190,3 +190,7 @@ b2
 
 biofs <- b1 + b2 + plot_layout(guides = "collect") & theme(legend.position = 'bottom')
 biofs
+
+#Save part 2 of Figure 3 (panels c and d)
+
+ggsave("plots/Figure_3_cd.pdf", biofs, height = 6, width = 9)
