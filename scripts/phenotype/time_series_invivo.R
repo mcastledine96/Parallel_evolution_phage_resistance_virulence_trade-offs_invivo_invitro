@@ -6,7 +6,7 @@ library(emmeans)
 
 ##In vivo timeseries
 
-viv_ts <- read.csv("data/phenotype/In_vivo_timeseries.csv", header = T)
+viv_ts <- read.csv("data/phenotype/invivo_timeseries.csv", header = T)
 
 #this data pertains to a time-series assay in which in vivo isolates from time points 1 and 2 are assayed against phage from timepoints 1, 2 and 3. Phage at timepoint 3 are post phage therapy. Isolates also tested against ancestral phage individually (PVM and 14_1)
 #1 = bacteria susceptible
