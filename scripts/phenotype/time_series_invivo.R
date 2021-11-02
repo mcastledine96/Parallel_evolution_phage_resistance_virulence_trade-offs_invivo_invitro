@@ -25,9 +25,9 @@ viv_ts_props_t2 <- filter(viv_ts_props, bact_time == "T2")
 
 viv_ts_props <- merge(viv_ts_props_t1, viv_ts_props_t2, all = T)
 
-##new plot
+##plot
 
-anc_res <- read.csv("phage_therapy/resistance/data/anc_resistance.csv", header = T)
+anc_res <- read.csv("data/phenotype/anc_resistance.csv", header = T)
 
 labs <- c(expression('14-1 (anc.)'), expression('PNM (anc.)'), "T1", "T2", "T3")
 
