@@ -6,7 +6,7 @@ library(ggplot2)
 library(emmeans)
 library(patchwork)
 
-vit_ts <- read.csv("data/phenotype/In_vitro_timeseries.csv", header = T)
+vit_ts <- read.csv("data/phenotype/invitro_timeseries.csv", header = T)
 
 #guide:
 #treat = in vitro phage treatment. 
@@ -174,7 +174,10 @@ vit <- ggplot(vit_ts_means, aes(group = bact_time, y = m.prop, x = `Phage time`)
 vit
 
 #running viv from time_series_invivo script on another tab to import plot object (run on same RStudio console then come back to run this line)
-viv + vit + plot_layout(ncol = 1, heights = c(1,2))
+vivvit <- viv + vit + plot_layout(ncol = 1, heights = c(1,2))
+
+ggsave("phage_therapy/Plots/Figure_1.pdf", vivvit, height = 8, width = 7)
+ggsave("phage_therapy/Plots/Figure_1.png", vivvit, height = 8, width = 7)
 
 ## analysing probability of resistance of T3 bacteria in added once and repeatedly treatment to ancestral vs contemporary bacteria
 
