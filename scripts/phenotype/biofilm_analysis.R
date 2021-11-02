@@ -194,3 +194,4 @@ biofs
 #Save part 2 of Figure 3 (panels c and d)
 
 ggsave("plots/Figure_3_cd.pdf", biofs, height = 6, width = 9)
+ggsave("plots/Figure_3_cd.png", biofs, height = 6, width = 9)
