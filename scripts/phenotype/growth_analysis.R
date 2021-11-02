@@ -6,7 +6,7 @@ library(ggplot2)
 library(patchwork)
 
 #vitro
-vitro <- read.csv("phage_therapy/growth_curve/data/vitro_final.csv", header = T)
+vitro <- read.csv("data/phenotype/invitro_growth_rates.csv", header = T)
 
 #dataset guide:
   #treat = combined treatment and phage resistance level
@@ -30,7 +30,7 @@ anova(vit_mod3.2, vit_mod3.4)
 emmeans::emmeans(vit_mod3.3, pairwise ~ tr2)
 
 #vivo
-vivo <- read.csv("phage_therapy/growth_curve/data/vivo_011119.csv", header = T)
+vivo <- read.csv("data/phenotype/invivo_growth_rates.csv", header = T)
 
 #bootstrap analysis
 
