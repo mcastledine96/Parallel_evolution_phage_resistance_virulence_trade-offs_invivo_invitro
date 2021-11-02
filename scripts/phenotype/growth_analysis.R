@@ -156,3 +156,6 @@ g2 <- ggplot(vitro2, aes(x = tr2, y = m.fit)) +
 growps <- g1 + g2 + plot_layout(ncol = 2)
 growps
 
+#Save out part 1 of Figure 3 (panels a and b)
+
+ggsave("phage_therapy/Plots/Figure_3_ab.pdf", growps, height = 5, width = 8)
