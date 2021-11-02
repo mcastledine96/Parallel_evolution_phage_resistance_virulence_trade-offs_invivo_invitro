@@ -17,7 +17,7 @@ This code is licensed under GPL-3.
 
 ### Phenotype scripts and analyses
 - these can be found in `scripts/phenotype`
-- 1. **time_series_invitro.R** and **time_series_invivo.R** are scripts used for analysis of bacteria - phage coevolution and levels of bacterial resistance to phage. To generate Figure 1, run both scripts following in-script prompts within the same RStudio session. Data files used for this analysis include **In_vitro_timeseries.csv** and **In_vivo_timeseries.csv** respectively.
+- 1. **time_series_invitro.R** and **time_series_invivo.R** are scripts used for analysis of bacteria - phage coevolution and levels of bacterial resistance to phage. To generate Figure 1, run both scripts following in-script prompts within the same RStudio session. Data files used for this analysis include **invitro_timeseries.csv**, **invivo_timeseries.csv** and **anc_resistance.csv** respectively.
 - 2. **virulence_models.R** includes analysis of the *Galleria* virulence assays for both the in vivo and in vitro clones. Data for this file is found in **data/phenotype/virulence_data.csv**. This script recreates **Figure 2** of the manuscript.
 - 3. **growth_analysis.R** includes analysis of in vivo and in vitro data, growth rates of clonal populations for phenotypic analysis. Data for this file is found in **invitro_growth_rates.csv** and **invivo_growth_rates.csv**
 - 4. **biofilm_analysis.R** includes analysis of in vivo and in vitro data, biofilm data of clonal populations for phenotypic analysis. Data for this file is found in **biofilm_data.csv**
