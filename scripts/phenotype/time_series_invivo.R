@@ -29,6 +29,8 @@ viv_ts_props <- merge(viv_ts_props_t1, viv_ts_props_t2, all = T)
 
 anc_res <- read.csv("data/phenotype/anc_resistance.csv", header = T)
 
+# This dataframe gives the proportion (prop) of ancestral (anc in bact_time) clones (n = 24) that are susceptible to each ancestral phage (In phage_time: 14_1 = 14-1, PVM = PNM). 
+
 labs <- c(expression('14-1 (anc.)'), expression('PNM (anc.)'), "T1", "T2", "T3")
 
 viv <- ggplot(data = viv_ts_props, aes(x = phage_time, y = prop, group = bact_time)) +
