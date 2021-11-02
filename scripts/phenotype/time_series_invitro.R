@@ -6,7 +6,7 @@ library(ggplot2)
 library(emmeans)
 library(patchwork)
 
-vit_ts <- read.csv("phage_therapy/time_series_exp/data/In_vitro_timeseries.csv", header = T)
+vit_ts <- read.csv("data/phenotype/In_vitro_timeseries.csv", header = T)
 
 #guide:
 #treat = in vitro phage treatment. 
