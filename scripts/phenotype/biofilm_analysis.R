@@ -11,7 +11,7 @@ library(patchwork)
 library(brms)
 library(tidybayes)
 
-biofilm <- read.csv("phage_therapy/biofilm_assay/data/biofilm_wrangled.csv", header = T, stringsAsFactors = F)
+biofilm <- read.csv("data/phenotype/biofilm_data.csv", header = T, stringsAsFactors = F)
 
 #dataset guide
   #flor = fluorescence measure
