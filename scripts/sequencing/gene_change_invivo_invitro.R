@@ -262,3 +262,129 @@ p1 +  (plot_spacer()/legends + plot_layout(heights = c(0.6, 0.4))) + plot_layout
 
 ggsave('plots/Figure_4.pdf', last_plot(), height = 10, width = 8.5)
 ggsave('plots/Figure_4.png', last_plot(), height = 10, width = 8.5)
+
+#---------------------------------------------------------------------------------#
+# Look at whether in vivo clone traits correlate with observed genetic changes ####
+#---------------------------------------------------------------------------------#
+
+d_invivo_snps <- group_by(d2, clone, time_point) %>%
+  do(select(invitro_snps, gene_name, pos, change2)) %>%
+  left_join(., filter(d2, pos %in% invitro_snps$pos) %>% select(., clone, time_point, pos, ref, alt, af)) %>%
+  mutate(af = replace_na(af, 0))
+
+# look at how many SNPs there are per clone
+d_invivo_summary <- group_by(d_invivo_snps, clone, time_point) %>%
+  summarise(num_snps = sum(af), .groups = 'drop')
+
+# do an nmds on the in vivo clones only
+d_clust <- select(d_invivo_snps, clone, time_point, pos, af, gene_name) %>%
+  unite(., 'id', c(clone, time_point), sep ='_') %>%
+  mutate(id = paste('c', id, sep = '')) %>%
+  spread(., id, af) %>%
+  arrange(pos) %>%
+  group_by(gene_name) %>%
+  mutate(n = 1:n()) %>%
+  ungroup() %>%
+  mutate(gene_name = ifelse(n > 1, paste(gene_name, n, sep = '_'), gene_name)) %>%
+  select(., -c(pos, n))
+
+d_clust <- tibble::column_to_rownames(d_clust, 'gene_name')
+
+nmds <- vegan::metaMDS(d_clust, distance = 'euclidean')
+
+vegan::stressplot(nmds)
+plot(nmds)
+
+# get data from nmds
+d_nmds <- fortify(nmds) %>%
+  janitor::clean_names() %>%
+  mutate_if(., is.factor, as.character)
+
+# wrangle sites
+d_sample <- filter(d_nmds, score== 'species') %>%
+  separate(., label, c('clone', 'time_point'), sep = '_')
+
+# get distance from 00
+dist_from_00 <- function(x, y){
+  return(sqrt((0 - x)^2+(0-y)^2))
+}
+
+# wrangle species
+d_gene <- filter(d_nmds, score == 'sites') %>%
+  rename(., gene_name = label) %>%
+  mutate(dist = dist_from_00(nmds1, nmds2))
+
+# phenotypic traits of invivo clones
+d_traits <- read.csv('data/phenotype/invivo_clone_phenotypes.csv') %>%
+  left_join(., read.csv('data/phenotype/invivo_hazard_ratios.csv')) %>%
+  separate(clone, c('time_point', 'clone'), sep = '_') %>%
+  mutate(time_point = as.character(parse_number(time_point)),
+         clone = paste('c', clone, sep =''))
+
+d_sample <- left_join(d_sample, d_traits)
+
+# fancy biplot ####
+p_nmds1 <- ggplot() +
+  geom_segment(aes(x = 0, y = 0, yend = nmds2, xend = nmds1, group = score), d_gene, arrow = arrow(length = unit(0.01, "npc")), col = 'grey') +
+  geom_text(aes(nmds1, nmds2, label = gene_name, hjust = 0.5*(1 - sign(nmds1)), vjust = 0.5*(1-sign(nmds2))), d_gene, col = 'grey') +
+  #ggrepel::geom_text_repel(aes(nmds1, nmds2, label = gene_name, col = change2), d_gene) +
+  geom_point(aes(nmds1, nmds2, col = virulence), size = 5, data = filter(d_sample)) +
+  #geom_point(aes(nmds1, nmds2), size = 5, col = 'red', data = filter(d_sample, is.na(virulence))) +
+  scale_x_continuous(expand = c(.25, .25)) +
+  scale_y_continuous(expand = c(.25, .25)) +
+  scale_colour_gradient(low = '#F3D0F9', high = '#D308F8', na.value = 'black') +
+  labs(title = '(a) Virulence',
+       x = 'nmds 1',
+       y = 'nmds 2') +
+  theme_bw(base_size = 14) +
+  theme(legend.position = 'bottom', legend.title = element_blank())
+p_nmds1
+p_nmds2 <- ggplot() +
+  geom_segment(aes(x = 0, y = 0, yend = nmds2, xend = nmds1, group = score), d_gene, arrow = arrow(length = unit(0.01, "npc")), col = 'grey') +
+  geom_text(aes(nmds1, nmds2, label = gene_name, hjust = 0.5*(1 - sign(nmds1)), vjust = 0.5*(1-sign(nmds2))), d_gene, col = 'grey') +
+  #ggrepel::geom_text_repel(aes(nmds1, nmds2, label = gene_name, col = change2), d_gene) +
+  geom_point(aes(nmds1, nmds2, col = growth_r), size = 5, data = filter(d_sample)) +
+  #geom_point(aes(nmds1, nmds2), size = 5, col = 'red', data = filter(d_sample, is.na(virulence))) +
+  scale_x_continuous(expand = c(.25, .25)) +
+  scale_y_continuous(expand = c(.25, .25)) +
+  scale_colour_gradient(low = '#F3D0F9', high = '#D308F8', na.value = 'black') +
+  labs(title = '(b) Growth',
+       x = 'nmds 1',
+       y = 'nmds 2') +
+  theme_bw(base_size = 14) +
+  theme(legend.position = 'bottom', legend.title = element_blank())
+
+p_nmds3 <- ggplot() +
+  geom_segment(aes(x = 0, y = 0, yend = nmds2, xend = nmds1, group = score), d_gene, arrow = arrow(length = unit(0.01, "npc")), col = 'grey') +
+  geom_text(aes(nmds1, nmds2, label = gene_name, hjust = 0.5*(1 - sign(nmds1)), vjust = 0.5*(1-sign(nmds2))), d_gene, col = 'grey') +
+  #ggrepel::geom_text_repel(aes(nmds1, nmds2, label = gene_name, col = change2), d_gene) +
+  geom_point(aes(nmds1, nmds2, col = log(biofilm)), size = 5, data = filter(d_sample)) +
+  #geom_point(aes(nmds1, nmds2), size = 5, col = 'red', data = filter(d_sample, is.na(virulence))) +
+  scale_x_continuous(expand = c(.25, .25)) +
+  scale_y_continuous(expand = c(.25, .25)) +
+  scale_colour_gradient(low = '#F3D0F9', high = '#D308F8', na.value = 'black', breaks = c(5.1, 5.4, 5.7)) +
+  labs(title = '(c) Biofilm',
+       x = 'nmds 1',
+       y = 'nmds 2') +
+  theme_bw(base_size = 14) +
+  theme(legend.position = 'bottom', legend.title = element_blank()) 
+
+p_nmds4 <- ggplot() +
+  geom_segment(aes(x = 0, y = 0, yend = nmds2, xend = nmds1, group = score), d_gene, arrow = arrow(length = unit(0.01, "npc")), col = 'grey') +
+  geom_text(aes(nmds1, nmds2, label = gene_name, hjust = 0.5*(1 - sign(nmds1)), vjust = 0.5*(1-sign(nmds2))), d_gene, col = 'grey') +
+  #ggrepel::geom_text_repel(aes(nmds1, nmds2, label = gene_name, col = change2), d_gene) +
+  geom_point(aes(nmds1, nmds2, col = res_type), size = 5, data = filter(d_sample)) +
+  #geom_point(aes(nmds1, nmds2), size = 5, col = 'red', data = filter(d_sample, is.na(virulence))) +
+  scale_x_continuous(expand = c(.25, .25)) +
+  scale_y_continuous(expand = c(.25, .25)) +
+  labs(title = '(d) Phage resistance',
+       x = 'nmds 1',
+       y = 'nmds 2') +
+  theme_bw(base_size = 14) +
+  theme(legend.position = 'bottom', legend.title = element_blank()) +
+  scale_color_manual(values = c("#6090C8", "#404058", "#B82838"), labels = c("Resistant\n(both phages)", "Resistant\n(one phage)", "Susceptible")) 
+
+p_nmds_all <- p_nmds1 + p_nmds2 + p_nmds3 + p_nmds4
+
+ggsave('plots/Figure_S5.pdf', p_nmds_all, height = 11, width = 11)
+ggsave('plots/Figure_S5.png', p_nmds_all, height = 11, width = 11)

@@ -138,6 +138,24 @@ params_invivo <- mutate(params_invivo, beforephage = intercept + treat2before_ph
   # calculate a hazard ratio for the postphage treatment
   mutate(hazard_post_vs_pre = exp(postphage - beforephage))
 
+# calculate invivo hazard for each clone
+invivo_hazards <- mutate(params_invivo, T1_3 = postphage + b_intercept_clone_e3,
+                         T1_4= postphage + b_intercept_clone_e4,
+                         T1_5 = postphage + b_intercept_clone_e5,
+                         T1_6 = postphage + b_intercept_clone_e6,
+                         T1_7 = postphage + b_intercept_clone_e7,
+                         T1_8 = postphage + b_intercept_clone_e8,
+                         T2_1 = postphage + b_intercept_clone_f1,
+                         T2_2 = postphage + b_intercept_clone_f2) %>%
+  select(chain, iteration, draw, postphage, starts_with('T', ignore.case = FALSE)) %>%
+  pivot_longer(., cols = starts_with('T', ignore.case = FALSE), names_to = 'clone', values_to = 'val') %>%
+  mutate(hazard_ratio = exp(val - postphage)) %>%
+  group_by(clone) %>%
+  median_qi(hazard_ratio)
+
+# save out this file
+write.csv(select(invivo_hazards, clone, virulence = hazard_ratio), 'data/phenotype/invivo_hazard_ratios.csv', row.names = FALSE)
+
 # calculate credible intervals of hazard ratios
 params2_invivo <- select(params_invivo, beforephage:hazard_post_vs_pre) %>%
   pivot_longer(cols = everything(), names_to = 'variable', values_to = 'estimate') %>%
@@ -148,7 +166,7 @@ params2_invivo <- select(params_invivo, beforephage:hazard_post_vs_pre) %>%
 
 # hazard ratio is 0.0450, which means the clones isolated after phage therapy were 95% less likely to cause the death of a galleria at any time point during the study
 
-cols <- c("black", 'dark grey')
+cols <- c("dark grey", 'black')
 
 # calculate survival curves
 # predict over population-level estimates
@@ -162,16 +180,16 @@ d_preds <- select(d_invivo, treat2, clone) %>%
 
 d_preds <- unnest(d_preds, preds) %>%
   select(-data) %>%
-  mutate(treat = ifelse(treat == 'after_phage_therapy', 'postphage', 'beforephage'))
+  mutate(treat = ifelse(treat == 'after_phage_therapy', 'After phage', 'Before phage'))
 
-d_preds_ancest <- filter(d_preds, treat == 'beforephage')
+d_preds_ancest <- filter(d_preds, treat == 'Before phage')
 
 vivo_plot <- ggplot(d_preds, aes(time, median, fill = treat)) +
-  geom_line(aes(col = treat), show.legend = FALSE) +
-  geom_ribbon(aes(time, ymin = ci_lb, ymax = ci_ub), alpha = 0.2, show.legend = FALSE) +
+  geom_line(aes(col = treat)) +
+  geom_ribbon(aes(time, ymin = ci_lb, ymax = ci_ub), alpha = 0.2) +
   theme_bw() +
   ylim(c(0,1)) +
-  theme(axis.text.y = element_text(size = 18, colour = "black"), axis.title = element_text(size = 20), axis.text.x = element_text(size = 18, colour = "black"), strip.background = element_blank(), plot.title = element_text(size = 18, hjust = 0), legend.position = "bottom", legend.text = element_text(size = 17)) +
+  theme(axis.text.y = element_text(size = 18, colour = "black"), axis.title = element_text(size = 20), axis.text.x = element_text(size = 18, colour = "black"), strip.background = element_blank(), plot.title = element_text(size = 18, hjust = 0), legend.position = "bottom", legend.text = element_text(size = 17), legend.title = element_blank()) +
   ylab("Survival probability") +
   xlab("") +
   scale_color_manual(values = cols) +
@@ -353,4 +371,3 @@ total_plot <- vivo_plot + invitro + invitro2
 
 ggsave('plots/Figure_2.pdf', total_plot, height = 7, width = 18)
 ggsave('plots/Figure_2.png', total_plot, height = 7, width = 18)
-remotes::install_github('jburos/rstanarm@bugfix/stansurv-formula')

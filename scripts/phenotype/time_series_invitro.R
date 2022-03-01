@@ -42,6 +42,9 @@ vit_ts_means <- group_by(vit_ts_props2, treat, bact_time, phage_time) %>%
             sq = sqrt(6),
             se = sdp/sq)
 
+vit_ts_means <- mutate(vit_ts_means,
+                       m.res = 1 - m.prop)
+
 #models
 summary(vit_ts_props) #dataset used for analysis
 
@@ -123,7 +126,7 @@ vit_ts_props3$treat[vit_ts_props3$treat == "mix_add"] <- "(c) Repeatedly"
 
 #Integrating resistance of in vitro bacteria (t3) to ancestral phage
 
-vit_anc <- read.csv("phage_therapy/time_series_exp/data/end_resistance.csv", header = T)
+vit_anc <- read.csv("data/phenotype/end_resistance.csv", header = T)
 
 vit_anc <- na.omit(vit_anc)
 
@@ -131,13 +134,15 @@ vit_anc_m <- group_by(vit_anc, treat, rep, phage) %>%
   summarise(s_infect = sum(infect),
             total = length(infect),
             prop = s_infect/total,
-            se_inf = sd(infect)/sqrt(total))
+            se_inf = sd(infect)/sqrt(total),
+            prop_r = 1 - prop)
 
 vit_anc_m2 <- group_by(vit_anc, treat, phage) %>%
   summarise(s_infect = sum(infect),
             total = length(infect),
             m.prop = s_infect/total,
-            se_inf = sd(infect)/sqrt(total))
+            se_inf = sd(infect)/sqrt(total),
+            m.res = 1 - m.prop)
 
 vit_anc_m$phage[vit_anc_m$phage == "14_1"] <- "a14-1"
 vit_anc_m$phage[vit_anc_m$phage == "PNM"] <- "aPNM"
@@ -153,21 +158,21 @@ vit_anc_m2$treat[vit_anc_m2$treat == "mix"] <- "(b) Once"
 vit_anc_m$treat[vit_anc_m$treat == "mix_add"] <- "(c) Repeatedly"
 vit_anc_m2$treat[vit_anc_m2$treat == "mix_add"] <- "(c) Repeatedly"
 
-vit <- ggplot(vit_ts_means, aes(group = bact_time, y = m.prop, x = `Phage time`)) +
-  geom_point(data = vit_ts_props3, aes(x = `Phage time`, y = prop,  fill = bact_time, col = bact_time), position = position_jitterdodge(0.3), alpha = 0.3) +
+vit <- ggplot(vit_ts_means, aes(group = bact_time, y = m.res, x = `Phage time`)) +
+  geom_point(data = vit_ts_props3, aes(x = `Phage time`, y = prop_resist,  fill = bact_time, col = bact_time), position = position_jitterdodge(0.3), alpha = 0.3) +
   geom_point(position = position_dodge(0.8), aes(col = bact_time), size = 2) +
-  geom_errorbar(aes(ymin = m.prop-se, ymax = m.prop+se, col = bact_time), width = 0.3, position = position_dodge(0.8)) +
+  geom_errorbar(data = vit_ts_means, aes(ymin = m.res-se, ymax = m.res+se, col = bact_time), width = 0.3, position = position_dodge(0.8)) +
   theme_bw() +
   facet_wrap(~treat) +
   theme(strip.background = element_blank(), strip.text = element_text(size = 14, hjust = 0), legend.text = element_text(size = 14), legend.position = "bottom", axis.text = element_text(size = 14, colour = "black"), axis.title = element_text(size = 16), legend.title = element_text(size = 16), axis.title.y = element_text(hjust = -0.2), plot.title = element_text(size = 15)) +
   annotate("rect", xmin = 0.7, xmax = 2.2, ymin = 0, ymax = 1, alpha = .1) + 
   scale_alpha(guide = 'none') +
-  ylab("Proportion of bacterial clones susceptible to phage") +
+  ylab("Proportion of bacterial clones resistant to phage") +
   labs(fill = "Bacteria time", col = "Bacteria time", title = expression(italic("In vitro")~" phage added:")) +
   palettetown::scale_color_poke(pokemon = 'fearow', spread = 3) +
-  geom_point(data = vit_anc_m, aes(x = phage_time, y = prop, col = bact_time), position = position_jitterdodge(0.3), alpha = 0.3) +
-  geom_errorbar(data = vit_anc_m2, aes(x = phage_time, ymin = m.prop-se_inf, ymax = m.prop+se_inf, col = bact_time), position = position_dodge(0.3), width = 0.2) +
-  geom_point(data = vit_anc_m2, aes(x = phage_time, y = m.prop, col = bact_time), position = position_dodge(0.3), size = 2) +
+  geom_point(data = vit_anc_m, aes(x = phage_time, y = prop_r, col = bact_time), position = position_jitterdodge(0.3), alpha = 0.3) +
+  geom_errorbar(data = vit_anc_m2, aes(x = phage_time, ymin = m.res-se_inf, ymax = m.res+se_inf, col = bact_time), position = position_dodge(0.3), width = 0.2) +
+  geom_point(data = vit_anc_m2, aes(x = phage_time, y = m.res, col = bact_time), position = position_dodge(0.3), size = 2) +
   geom_line(position = position_dodge(0.8), aes(col = bact_time)) +
   scale_x_discrete(labels = c('14-1\n(anc.)', 'PNM\n(anc.)', "T1", "T2", "T3")) 
 

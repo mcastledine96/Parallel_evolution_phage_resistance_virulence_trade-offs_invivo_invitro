@@ -16,7 +16,8 @@ viv_ts_props <- group_by(viv_ts, bact_time, phage_time, phage_type) %>%
   summarise(., sum_inf = sum(infect),
             pop = length(bact_clone),
             prop = sum_inf/pop,
-            sd_p = sd(prop)) %>%
+            sd_p = sd(prop),
+            prop_r = 1 - prop) %>%
   ungroup()
 
 viv_ts_props_t1 <- filter(viv_ts_props, bact_time == "T1")
@@ -29,13 +30,16 @@ viv_ts_props <- merge(viv_ts_props_t1, viv_ts_props_t2, all = T)
 
 anc_res <- read.csv("data/phenotype/anc_resistance.csv", header = T)
 
+anc_res <- mutate(anc_res,
+                  prop_r = 1 - prop)
+
 # This dataframe gives the proportion (prop) of ancestral (anc in bact_time) clones (n = 24) that are susceptible to each ancestral phage (In phage_time: 14_1 = 14-1, PVM = PNM). 
 
 labs <- c(expression('14-1 (anc.)'), expression('PNM (anc.)'), "T1", "T2", "T3")
 
-viv <- ggplot(data = viv_ts_props, aes(x = phage_time, y = prop, group = bact_time)) +
-  geom_point(data = viv_ts_props, aes(x = phage_time, y = prop, group = bact_time, col = bact_time), size = 2, position = position_dodge(0.3)) +
-  geom_point(data = anc_res, aes(x = phage_time, y = prop, group = bact_time), size = 2) +
+viv <- ggplot(data = viv_ts_props, aes(x = phage_time, y = prop_r, group = bact_time)) +
+  geom_point(data = viv_ts_props, aes(x = phage_time, y = prop_r, group = bact_time, col = bact_time), size = 2, position = position_dodge(0.3)) +
+  geom_point(data = anc_res, aes(x = phage_time, y = prop_r, group = bact_time), size = 2) +
   geom_line(data = viv_ts_props, position = position_dodge(0.3), aes(col = bact_time, group = bact_time)) +
   theme_bw() +
   scale_alpha(guide = "none") +
@@ -45,7 +49,7 @@ viv <- ggplot(data = viv_ts_props, aes(x = phage_time, y = prop, group = bact_ti
   labs(title = expression("(a)"~italic("In vivo"))) +
   palettetown::scale_color_poke(pokemon = 'fearow', spread = 3)  +
   geom_line(data = anc_res, position = position_dodge(0.3), col = "black") +
-  geom_label(label = "Anc.", y = 1, x = 5.2)
+  geom_label(label = "Anc.", y = 0.04, x = 5.2)
 
 viv #add this to the plot in the in vitro time series script
 
