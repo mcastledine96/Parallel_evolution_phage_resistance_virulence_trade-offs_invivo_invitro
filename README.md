@@ -1,4 +1,4 @@
-# Parallel_evolution_phage_resistance_virulence_trade-offs_invivo_invitro
+# Parallel evolution of _Pseudomonas aeruginosa_ phage resistance and virulence loss in response to phage treatment _in vivo_ and _in vitro_
 
 Coding and data repository for research article: "Parallel evolution of _Pseudomonas aeruginosa_ phage resistance and virulence loss in response to phage treatment _in vivo_ and _in vitro_". 
 
