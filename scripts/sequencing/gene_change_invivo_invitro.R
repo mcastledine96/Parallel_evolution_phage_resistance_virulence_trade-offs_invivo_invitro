@@ -319,7 +319,9 @@ d_traits <- read.csv('data/phenotype/invivo_clone_phenotypes.csv') %>%
   left_join(., read.csv('data/phenotype/invivo_hazard_ratios.csv')) %>%
   separate(clone, c('time_point', 'clone'), sep = '_') %>%
   mutate(time_point = as.character(parse_number(time_point)),
-         clone = paste('c', clone, sep =''))
+         clone = paste('c', clone, sep =''),
+         clone = ifelse(clone == 'c1' & time_point == 2, 'c9', clone),
+         clone = ifelse(clone == 'c2' & time_point == 2, 'c10', clone))
 
 d_sample <- left_join(d_sample, d_traits)
 
